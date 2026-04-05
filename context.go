@@ -709,6 +709,38 @@ func (c *Context) FormFile(name string) (*multipart.FileHeader, error) {
 	return fh, err
 }
 
+// FormFileContent returns the first file content and its hash for the provided form key.
+// It returns the file header, content bytes, and an error if any.
+// The content is read into memory, so it should be used with caution for large files.
+// Example:
+//
+//	fileHeader, content, err := c.FormFileContent("file")
+//	if err != nil {
+//	    c.JSON(400, gin.H{"error": err.Error()})
+//	    return
+//	}
+//	hash := sha1.Sum(content)
+//	hexStr := hex.EncodeToString(hash[:])
+//	c.JSON(200, gin.H{"file_name": fileHeader.Filename, "hash": hexStr})
+func (c *Context) FormFileContent(name string) (*multipart.FileHeader, []byte, error) {
+	if c.Request.MultipartForm == nil {
+		if err := c.Request.ParseMultipartForm(c.engine.MaxMultipartMemory); err != nil {
+			return nil, nil, err
+		}
+	}
+	file, fh, err := c.Request.FormFile(name)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer file.Close()
+
+	content, err := io.ReadAll(file)
+	if err != nil {
+		return nil, nil, err
+	}
+	return fh, content, nil
+}
+
 // MultipartForm is the parsed multipart form, including file uploads.
 func (c *Context) MultipartForm() (*multipart.Form, error) {
 	err := c.Request.ParseMultipartForm(c.engine.MaxMultipartMemory)

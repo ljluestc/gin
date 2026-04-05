@@ -167,6 +167,45 @@ func TestContextFormFile(t *testing.T) {
 	require.NoError(t, c.SaveUploadedFile(f, "test"))
 }
 
+func TestContextFormFileContent(t *testing.T) {
+	buf := new(bytes.Buffer)
+	mw := multipart.NewWriter(buf)
+	w, err := mw.CreateFormFile("file", "test.txt")
+	require.NoError(t, err)
+	fileContent := []byte("hello world test content")
+	_, err = w.Write(fileContent)
+	require.NoError(t, err)
+	mw.Close()
+
+	c, _ := CreateTestContext(httptest.NewRecorder())
+	c.Request, _ = http.NewRequest(http.MethodPost, "/", buf)
+	c.Request.Header.Set("Content-Type", mw.FormDataContentType())
+
+	fh, content, err := c.FormFileContent("file")
+	require.NoError(t, err)
+	assert.Equal(t, "test.txt", fh.Filename)
+	assert.Equal(t, fileContent, content)
+
+	// Verify content can be hashed
+	assert.Equal(t, len(fileContent), len(content))
+}
+
+func TestContextFormFileContentFailed(t *testing.T) {
+	buf := new(bytes.Buffer)
+	mw := multipart.NewWriter(buf)
+	mw.Close()
+
+	c, _ := CreateTestContext(httptest.NewRecorder())
+	c.Request, _ = http.NewRequest(http.MethodPost, "/", nil)
+	c.Request.Header.Set("Content-Type", mw.FormDataContentType())
+	c.engine.MaxMultipartMemory = 8 << 20
+
+	fh, content, err := c.FormFileContent("nonexistent")
+	require.Error(t, err)
+	assert.Nil(t, fh)
+	assert.Nil(t, content)
+}
+
 func TestContextFormFileFailed(t *testing.T) {
 	buf := new(bytes.Buffer)
 	mw := multipart.NewWriter(buf)
