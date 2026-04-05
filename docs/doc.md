@@ -1467,6 +1467,45 @@ Test it with:
 curl -X POST -v --form name=user --form "avatar=@./avatar.png" http://localhost:8080/profile
 ```
 
+### Get file content and hash
+
+When you need to read the file content before saving (e.g., to compute a hash), use `FormFileContent`:
+
+```go
+func main() {
+  router := gin.Default()
+  router.POST("/upload", func(c *gin.Context) {
+    // Get file header, content, and error
+    fileHeader, content, err := c.FormFileContent("file")
+    if err != nil {
+      c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+      return
+    }
+
+    // Compute hash (e.g., SHA1)
+    hash := sha1.Sum(content)
+    hexStr := hex.EncodeToString(hash[:])
+
+    // Optionally save the file
+    // c.SaveUploadedFile(fileHeader, "path/"+fileHeader.Filename)
+
+    c.JSON(http.StatusOK, gin.H{
+      "file_name": fileHeader.Filename,
+      "size":      len(content),
+      "sha1":      hexStr,
+    })
+  })
+  router.Run(":8080")
+}
+```
+
+Test it with:
+
+```sh
+curl -X POST --form "file=@./test.txt" http://localhost:8080/upload
+# Output: {"file_name":"test.txt","sha1":"...","size":123}
+```
+
 ### Bind form-data request with custom struct
 
 The follow example using custom struct:
