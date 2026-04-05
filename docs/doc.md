@@ -281,6 +281,8 @@ References issue [#774](https://github.com/gin-gonic/gin/issues/774) and detail 
 
 > The filename is always optional and must not be used blindly by the application: path information should be stripped, and conversion to the server file system rules should be done.
 
+If you need file content (for example, to compute a hash), use `file.Open()` to read from the uploaded stream.
+
 ```go
 func main() {
   router := gin.Default()
@@ -288,13 +290,38 @@ func main() {
   router.MaxMultipartMemory = 8 << 20  // 8 MiB
   router.POST("/upload", func(c *gin.Context) {
     // Single file
-    file, _ := c.FormFile("file")
-    log.Println(file.Filename)
+    file, err := c.FormFile("file")
+    if err != nil {
+      c.String(http.StatusBadRequest, "invalid file: %v", err)
+      return
+    }
+
+    src, err := file.Open()
+    if err != nil {
+      c.String(http.StatusInternalServerError, "open file failed: %v", err)
+      return
+    }
+    defer src.Close()
+
+    h := sha256.New()
+    if _, err = io.Copy(h, src); err != nil {
+      c.String(http.StatusInternalServerError, "hash file failed: %v", err)
+      return
+    }
+    checksum := hex.EncodeToString(h.Sum(nil))
+    filename := filepath.Base(file.Filename)
+    dst := filepath.Join("./files", filename)
 
     // Upload the file to specific dst.
-    c.SaveUploadedFile(file, dst)
+    if err := c.SaveUploadedFile(file, dst); err != nil {
+      c.String(http.StatusInternalServerError, "save file failed: %v", err)
+      return
+    }
 
-    c.String(http.StatusOK, fmt.Sprintf("'%s' uploaded!", file.Filename))
+    c.JSON(http.StatusOK, gin.H{
+      "file_name": filename,
+      "sha256": checksum,
+    })
   })
   router.Run(":8080")
 }
