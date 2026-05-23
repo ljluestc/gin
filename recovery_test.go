@@ -5,6 +5,7 @@
 package gin
 
 import (
+	"errors"
 	"net"
 	"net/http"
 	"os"
@@ -150,6 +151,44 @@ func TestPanicWithAbortHandler(t *testing.T) {
 	out := buf.String()
 	assert.Contains(t, out, "net/http: abort Handler")
 	assert.NotContains(t, out, "panic recovered")
+}
+
+func TestPanicWithBrokenPipeByMessage(t *testing.T) {
+	const expectCode = 204
+
+	expectMessages := []string{
+		"broken pipe",
+		"connection reset by peer",
+		"request headers: small read buffer",
+		"unexpected EOF",
+		"i/o timeout",
+	}
+
+	for _, msg := range expectMessages {
+		t.Run("Recovery from "+msg, func(t *testing.T) {
+			var buf strings.Builder
+
+			router := New()
+			router.Use(RecoveryWithWriter(&buf))
+			router.GET("/recovery", func(c *Context) {
+				// Start writing response
+				c.Header("X-Test", "Value")
+				c.Status(expectCode)
+
+				// Panic with a message-only error variant.
+				panic(&net.OpError{Err: errors.New(msg)})
+			})
+
+			// RUN
+			w := PerformRequest(router, http.MethodGet, "/recovery")
+
+			// TEST
+			assert.Equal(t, expectCode, w.Code)
+			out := strings.ToLower(buf.String())
+			assert.Contains(t, out, strings.ToLower(msg))
+			assert.NotContains(t, out, "[recovery]")
+		})
+	}
 }
 
 func TestCustomRecoveryWithWriter(t *testing.T) {

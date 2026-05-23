@@ -28,12 +28,42 @@ const (
 	stackSkip = 3
 )
 
+var brokenPipeErrorIndicators = []string{
+	"broken pipe",
+	"connection reset by peer",
+	"reset by peer",
+	"request headers: small read buffer",
+	"unexpected eof",
+	"i/o timeout",
+}
+
 // RecoveryFunc defines the function passable to CustomRecovery.
 type RecoveryFunc func(c *Context, err any)
 
 // Recovery returns a middleware that recovers from any panics and writes a 500 if there was one.
 func Recovery() HandlerFunc {
 	return RecoveryWithWriter(DefaultErrorWriter)
+}
+
+func isBrokenPipeError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errors.Is(err, syscall.EPIPE) ||
+		errors.Is(err, syscall.ECONNRESET) ||
+		errors.Is(err, http.ErrAbortHandler) {
+		return true
+	}
+
+	errMsg := strings.ToLower(err.Error())
+	for _, indicator := range brokenPipeErrorIndicators {
+		if strings.Contains(errMsg, indicator) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // CustomRecovery returns a middleware that recovers from any panics and calls the provided handle func to handle it.
@@ -63,9 +93,7 @@ func CustomRecoveryWithWriter(out io.Writer, handle RecoveryFunc) HandlerFunc {
 				var isBrokenPipe bool
 				err, ok := rec.(error)
 				if ok {
-					isBrokenPipe = errors.Is(err, syscall.EPIPE) ||
-						errors.Is(err, syscall.ECONNRESET) ||
-						errors.Is(err, http.ErrAbortHandler)
+					isBrokenPipe = isBrokenPipeError(err)
 				}
 				if logger != nil {
 					if isBrokenPipe {
