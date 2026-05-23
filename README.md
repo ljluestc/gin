@@ -55,6 +55,30 @@ With [Go's module support](https://go.dev/wiki/Modules#how-to-use-modules), simp
 import "github.com/gin-gonic/gin"
 ```
 
+### Go modules troubleshooting
+
+If `go run` or `go build` fails with errors like:
+
+- `module github.com/gin-gonic/gin@latest found (...), but does not contain package github.com/gin-gonic/gin`
+- `module golang.org/x/sync@latest found (...), but does not contain package golang.org/x/sync/errgroup`
+
+check your local module setup and cache first:
+
+```sh
+# From your project root:
+go clean -modcache
+go mod tidy
+go mod download
+```
+
+Also verify that:
+
+- your project `go.mod` uses your own module path (for example `module myapp`) and not `module github.com/gin-gonic/gin`
+- you are using a supported Go version
+- your `GOPROXY` setting is reachable in your network environment
+
+If the issue persists, run `go env` and share your `go.mod`, `go.sum`, and full error output in a bug report.
+
 ### Your First Gin Application
 
 Here's a complete example that demonstrates Gin's simplicity:
