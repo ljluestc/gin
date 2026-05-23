@@ -17,6 +17,7 @@
     - [Multiple files](#multiple-files)
   - [Grouping routes](#grouping-routes)
   - [Redirects](#redirects)
+  - [Register pointer receiver methods discovered by reflection](#register-pointer-receiver-methods-discovered-by-reflection)
 - [Middleware](#middleware)
   - [Blank Gin without middleware by default](#blank-gin-without-middleware-by-default)
   - [Using middleware](#using-middleware)
@@ -397,6 +398,35 @@ r.GET("/test", func(c *gin.Context) {
 r.GET("/test2", func(c *gin.Context) {
     c.JSON(http.StatusOK, gin.H{"hello": "world"})
 })
+```
+
+### Register pointer receiver methods discovered by reflection
+
+When your handler methods are defined on a pointer receiver (for example `func (h *Handler) List(c *gin.Context)`), reflect on the pointer value and convert the reflected method to `gin.HandlerFunc`.
+
+```go
+type ServiceHandler struct{}
+
+func (h *ServiceHandler) Pages(c *gin.Context) {
+  c.String(http.StatusOK, "ok")
+}
+
+func main() {
+  r := gin.Default()
+  h := &ServiceHandler{}
+
+  method := reflect.ValueOf(h).MethodByName("Pages")
+  if !method.IsValid() {
+    panic("Pages method not found")
+  }
+  pages, ok := method.Interface().(gin.HandlerFunc)
+  if !ok {
+    panic("Pages is not a gin.HandlerFunc")
+  }
+
+  r.GET("/pages", pages)
+  r.Run(":8080")
+}
 ```
 
 ## Middleware
