@@ -41,6 +41,7 @@
   - [Bind Uri](#bind-uri)
   - [Bind custom unmarshaler](#bind-custom-unmarshaler)
   - [Bind Header](#bind-header)
+  - [Merge middleware values with JSON body binding](#merge-middleware-values-with-json-body-binding)
   - [Bind HTML checkboxes](#bind-html-checkboxes)
   - [Multipart/Urlencoded binding](#multiparturlencoded-binding)
   - [Bind form-data request with custom struct](#bind-form-data-request-with-custom-struct)
@@ -1377,6 +1378,53 @@ func main() {
 }
 ```
 
+### Merge middleware values with JSON body binding
+
+If you need to combine header-derived data from middleware with fields bound by `ShouldBindJSON`, keep middleware data in `Context` and merge it in the handler after binding.
+
+```go
+package main
+
+import (
+  "net/http"
+
+  "github.com/gin-gonic/gin"
+)
+
+type CreateOrderRequest struct {
+  ProductID string `json:"product_id" binding:"required"`
+  TenantID  string `json:"tenant_id"`
+}
+
+func TenantMiddleware() gin.HandlerFunc {
+  return func(c *gin.Context) {
+    tenantID := c.GetHeader("X-Tenant-ID")
+    c.Set("tenant_id", tenantID)
+    c.Next()
+  }
+}
+
+func main() {
+  r := gin.Default()
+  r.Use(TenantMiddleware())
+
+  r.POST("/orders", func(c *gin.Context) {
+    var req CreateOrderRequest
+    if err := c.ShouldBindJSON(&req); err != nil {
+      c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+      return
+    }
+
+    if req.TenantID == "" {
+      req.TenantID = c.GetString("tenant_id")
+    }
+
+    c.JSON(http.StatusOK, req)
+  })
+
+  r.Run(":8080")
+}
+```
 ### Bind HTML checkboxes
 
 See the [detail information](https://github.com/gin-gonic/gin/issues/129#issuecomment-124260092)
