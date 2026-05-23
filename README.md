@@ -122,6 +122,21 @@ After running your first Gin application, explore these resources to learn more:
   - WebSocket connections
   - Template rendering
 
+#### 🧰 Project Scaffolding & CLI Workflow
+
+Gin focuses on being a lightweight HTTP framework and does not provide built-in project management commands such as `gin new`, `gin build`, or `gin run`.
+
+For scaffolding and day-to-day workflow, use standard Go tooling or your preferred generator:
+
+```sh
+mkdir myapp
+cd myapp
+go mod init example.com/myapp
+go get github.com/gin-gonic/gin
+```
+
+Then bootstrap from the examples above or from the [examples repository](https://github.com/gin-gonic/examples), and use standard Go commands (`go run`, `go build`, `go test`) in your project workflow.
+
 ## 📖 Documentation
 
 ### API Reference
